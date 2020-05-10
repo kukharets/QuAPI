@@ -1,39 +1,30 @@
-const mongoose = require('mongoose');
-const util = require('util');
+const config = require('./common/config/env.config.js');
 
-// config should be imported before importing any other file
-const config = require('./config/config');
-const app = require('./config/express');
+const express = require('express');
+const app = express();
+const bodyParser = require('body-parser');
 
-const debug = require('debug')('express-mongoose-es6-rest-api:index');
+const AuthorizationRouter = require('./authorization/routes.config');
+const UsersRouter = require('./users/routes.config');
 
-// make bluebird default Promise
-Promise = require('bluebird'); // eslint-disable-line no-global-assign
-
-// plugin bluebird promise in mongoose
-mongoose.Promise = Promise;
-
-// connect to mongo db
-const mongoUri = config.mongo.host;
-mongoose.connect(mongoUri, { server: { socketOptions: { keepAlive: 1 } } });
-mongoose.connection.on('error', () => {
-  throw new Error(`unable to connect to database: ${mongoUri}`);
+app.use(function (req, res, next) {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE');
+    res.header('Access-Control-Expose-Headers', 'Content-Length');
+    res.header('Access-Control-Allow-Headers', 'Accept, Authorization, Content-Type, X-Requested-With, Range');
+    if (req.method === 'OPTIONS') {
+        return res.send(200);
+    } else {
+        return next();
+    }
 });
 
-// print mongoose logs in dev env
-if (config.mongooseDebug) {
-  mongoose.set('debug', (collectionName, method, query, doc) => {
-    debug(`${collectionName}.${method}`, util.inspect(query, false, 20), doc);
-  });
-}
+app.use(bodyParser.json());
+AuthorizationRouter.routesConfig(app);
+UsersRouter.routesConfig(app);
 
-// module.parent check is required to support mocha watch
-// src: https://github.com/mochajs/mocha/issues/1912
-if (!module.parent) {
-  // listen on port config.port
-  app.listen(config.port, () => {
-    console.info(`server started on port ${config.port} (${config.env})`); // eslint-disable-line no-console
-  });
-}
 
-module.exports = app;
+app.listen(config.port, function () {
+    console.log('app listening at port %s', config.port);
+});
